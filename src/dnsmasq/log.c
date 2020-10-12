@@ -278,7 +278,7 @@ void my_syslog(int priority, const char *format, ...)
 {
   va_list ap;
   struct log_entry *entry;
-  time_t time_now;
+  struct timespec ts;
   char *p;
   size_t len;
   pid_t pid = getpid();
@@ -364,14 +364,20 @@ void my_syslog(int priority, const char *format, ...)
 	  tmp->next = entry;
 	}
       
-      time(&time_now);
+      timespec_get(&ts, TIME_UTC);
       p = entry->payload;
       if (!log_to_file)
 	p += sprintf(p, "<%d>", priority | log_fac);
 
       /* Omit timestamp for default daemontools situation */
       if (!log_stderr || !option_bool(OPT_NO_FORK)) 
-	p += sprintf(p, "%.15s ", ctime(&time_now) + 4);
+        {
+          char timestamp[100];
+          char timezone[6];
+          strftime(timestamp, sizeof timestamp, "%FT%T", gmtime(&ts.tv_sec));
+          strftime(timezone, sizeof timezone, "%z", gmtime(&ts.tv_sec));
+          p += sprintf(p, "%s.%09ld%s ", timestamp, ts.tv_nsec, timezone);
+        }
       
       p += sprintf(p, "dnsmasq%s[%d]: ", func, (int)pid);
         
